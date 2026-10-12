@@ -1,0 +1,1388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Echo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Echo at night: a deep navy room with one record turning in the background.
+     Solid surfaces on top, one periwinkle accent, monospace for the numbers. */
+  :root {
+    color-scheme: dark;
+    --bg: #0a1024;
+    --bg-2: #0e1530;
+    --card: #131c3a;
+    --raised: #1b2550;
+    --line: #26315c;
+    --line-soft: #222b52;
+    --edge: #36427a;
+    --ink: #eef1fa;
+    --soft: #c3cae2;
+    --muted: #a3acc9;
+    --accent: #8e9bff;
+    --accent-hover: #aab4ff;
+    --on-accent: #0a1024;
+    --love: #ff9cc2;
+    --error: #ffa79c;
+    --error-tint: rgba(255, 92, 80, 0.14);
+    --groove-a: #06080f;
+    --groove-b: #111731;
+    --sans: "Schibsted Grotesk", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 1rem/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  body.has-dock { padding-bottom: 280px; }
+  a { color: var(--accent); }
+  a:hover { color: var(--accent-hover); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .page { position: relative; z-index: 1; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+  .eyebrow { margin: 0; font: 400 0.75rem/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  h1, h2, h3 { margin: 0; }
+
+  /* ---------------------------------------------------------------- buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 44px; padding: 0 18px; border-radius: 999px;
+    border: 1px solid var(--edge); background: var(--bg); color: var(--ink);
+    font: 600 0.95rem/1 var(--sans); text-decoration: none; white-space: nowrap; cursor: pointer;
+  }
+  .btn:hover { background: var(--raised); color: var(--ink); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+  .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--on-accent); }
+  .btn.big { min-height: 52px; padding: 0 24px; font-size: 1rem; }
+  .btn.small { min-height: 40px; padding: 0 14px; font-size: 0.85rem; }
+  .btn.done, .btn.done:hover { background: transparent; color: var(--soft); cursor: default; }
+  .btn:disabled { cursor: default; }
+  .btn svg { width: 16px; height: 16px; }
+
+  /* ---------------------------------------------------------- the room's record */
+  .room { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .record-big {
+    position: absolute; aspect-ratio: 1; border-radius: 50%; container-type: inline-size;
+    opacity: 0; transition: opacity 0.8s ease;
+  }
+  body.ready .record-big { opacity: 1; }
+  body.landing-view .record-big { width: min(760px, 110vw); top: 64px; right: -220px; }
+  body.app-view .record-big { width: min(840px, 120vw); left: -300px; bottom: -300px; }
+  .drift, .turn { position: absolute; inset: 0; }
+  .drift { animation: spin 60s linear infinite; }                 /* the room never quite stops */
+  .turn { animation: spin 1.8s linear infinite; animation-play-state: paused; }   /* 33 1/3 rpm */
+  body.music .turn { animation-play-state: running; }
+  .disc {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: repeating-radial-gradient(circle at center, var(--groove-a) 0 2px, var(--groove-b) 3px, var(--groove-a) 4px);
+    box-shadow: 0 0 0 1px #1e274a, 0 40px 120px rgba(0, 0, 0, 0.55);
+  }
+  .disc-label {
+    position: absolute; inset: 33%; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+    display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; padding: 10% 0;
+  }
+  .disc-name { font: 700 5.6cqi/1 var(--sans); letter-spacing: -0.03em; }
+  .disc-hole { width: 7%; aspect-ratio: 1; border-radius: 50%; background: var(--bg); }
+  .disc-side { font: 400 1.5cqi/1 var(--mono); letter-spacing: 0.08em; }
+  .sheen {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(from 20deg, rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, 0.07) 22deg,
+      rgba(255, 255, 255, 0) 50deg, rgba(255, 255, 255, 0) 190deg, rgba(255, 255, 255, 0.05) 212deg, rgba(255, 255, 255, 0) 240deg);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ----------------------------------------------------------------- header */
+  .topbar-band { position: relative; }
+  body.app-view .topbar-band { background: var(--bg); border-bottom: 1px solid #1e274a; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 12px 0; flex-wrap: wrap; }
+  .brand-group { display: flex; align-items: center; gap: 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink); text-decoration: none; }
+  .brand:hover { color: var(--ink); }
+  .brand span { font: 700 1.4rem/1 var(--sans); letter-spacing: -0.03em; }
+  .pill { font: 400 0.7rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 10px; border: 1px solid var(--edge); border-radius: 999px; color: var(--soft); }
+  .nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .nav .link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; color: var(--soft); text-decoration: none; font-size: 0.95rem; font-weight: 500; }
+  .nav .link:hover { color: var(--ink); }
+  .who-name { color: var(--muted); font-size: 0.9rem; padding: 0 4px; }
+
+  .notice { margin: 16px 0 0; padding: 14px 16px; border-radius: 14px; background: var(--error-tint); color: var(--error); border: 1px solid rgba(255, 167, 156, 0.3); }
+
+  /* ----------------------------------------------------------------- landing */
+  .hero { max-width: 600px; padding: 88px 0 140px; display: flex; flex-direction: column; gap: 24px; }
+  .hero h1 { font: 700 clamp(2.5rem, 5.4vw, 4.25rem)/1.02 var(--sans); letter-spacing: -0.035em; }
+  .lede { margin: 0; max-width: 30em; font-size: 1.2rem; color: var(--soft); }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .hint { margin: 0; font-size: 0.9rem; color: var(--muted); }
+  .band { position: relative; background: var(--bg); border-top: 1px solid #1e274a; }
+  .band.alt { background: var(--bg-2); }
+  .band .wrap { padding-top: 72px; padding-bottom: 72px; display: flex; flex-direction: column; gap: 32px; }
+  .band h2 { font: 700 clamp(1.75rem, 3vw, 2.25rem)/1.1 var(--sans); letter-spacing: -0.025em; }
+  .formula { margin: 10px 0 0; font: 400 1.1rem/1.4 var(--mono); color: var(--soft); }
+  .examples { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+  .example { padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+  .example.best { border: 1.5px solid var(--accent); }
+  .example-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .example-head strong { display: block; font-size: 1.1rem; font-weight: 600; }
+  .example-head span { font-size: 0.9rem; color: var(--muted); }
+  .example-head b { font: 500 1.5rem/1.1 var(--mono); }
+  .example.best .example-head b, .example.best .verdict { color: var(--accent); }
+  .verdict { margin: 0; font-size: 0.9rem; font-weight: 500; color: var(--muted); }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; }
+  .steps li { border-top: 2px solid var(--ink); padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .steps h3 { font-size: 1.25rem; font-weight: 600; }
+  .steps p { margin: 0; font-size: 0.95rem; color: var(--soft); }
+  .site-foot .wrap { padding-top: 28px; padding-bottom: 44px; flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 0.9rem; color: var(--muted); }
+
+  /* --------------------------------------------------------------- meters */
+  .meters { display: grid; grid-template-columns: 96px minmax(0, 1fr) 52px; gap: 10px 14px; align-items: center; font-size: 0.82rem; color: var(--soft); }
+  .meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .meter span { display: block; height: 100%; border-radius: 3px; }
+  .meter.shared span { background: var(--ink); }
+  .meter.new span { background: var(--accent); }
+  .meters .val { font: 400 0.82rem/1 var(--mono); text-align: right; color: var(--ink); }
+
+  /* --------------------------------------------------------------- the app */
+  .app-grid { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; padding: 32px 0 72px; }
+  .aside { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .matches-col { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .panel { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+  .panel.tight { padding: 20px 24px; gap: 8px; }
+  .panel-title { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
+  .panel p { margin: 0; font-size: 0.9rem; color: var(--muted); }
+  .fp { display: flex; align-items: flex-end; gap: 2px; overflow: hidden; flex: none; }
+  .fp span { display: block; width: 2px; border-radius: 1px; background: var(--ink); flex: none; }
+  .top-list { list-style: none; margin: 0; padding: 0; }
+  .top-list li { display: flex; gap: 14px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--line-soft); font-size: 0.95rem; }
+  .top-list .n { width: 20px; flex: none; font: 400 0.75rem/1 var(--mono); color: var(--muted); }
+  .toggle { display: flex; gap: 10px; align-items: center; min-height: 44px; cursor: pointer; color: var(--soft); font-size: 0.95rem; }
+  .toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+  .people { list-style: none; margin: 0; padding: 0; }
+  .people li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line-soft); font-size: 0.95rem; }
+  .people span { color: var(--muted); font-size: 0.82rem; }
+  .page-head h1 { font: 700 clamp(1.9rem, 3.4vw, 2.5rem)/1.1 var(--sans); letter-spacing: -0.03em; }
+  .page-head p { margin: 6px 0 0; color: var(--soft); }
+  .empty { padding: 28px; color: var(--muted); }
+
+  .match { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .match-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .who-block { display: flex; align-items: center; gap: 16px; min-width: 0; }
+  .rank { font: 400 0.8rem/1 var(--mono); color: var(--muted); }
+  .who-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .match-name { font: 600 1.2rem/1.2 var(--sans); letter-spacing: -0.01em; }
+  .match-sub { font-size: 0.82rem; color: var(--muted); }
+  .score-block { display: flex; align-items: center; gap: 16px; }
+  .score { display: flex; flex-direction: column; align-items: flex-end; }
+  .score b { font: 500 1.5rem/1.1 var(--mono); }
+  .score small { font: 400 0.68rem/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px 32px; }
+  .side h3 { margin: 0 0 10px; font: 400 0.75rem/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips li { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--raised); font-size: 0.9rem; }
+  .picks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .pick { display: flex; align-items: center; gap: 12px; padding: 4px 10px 4px 4px; border-radius: 12px; }
+  .pick.now { background: var(--raised); }
+  .play-btn {
+    width: 44px; height: 44px; flex: none; padding: 0; border-radius: 50%;
+    border: 1px solid var(--edge); background: var(--bg); color: var(--ink);
+    display: grid; place-items: center; cursor: pointer;
+  }
+  .play-btn:hover { border-color: var(--accent); }
+  .play-btn[aria-busy="true"] { opacity: 0.6; }
+  .play-btn svg { width: 14px; height: 14px; }
+  .pick.now .play-btn { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .play-btn .pause, .pick.now .play-btn .play { display: none; }
+  .pick.now .play-btn .pause { display: block; }
+  .pick-text { display: flex; flex-direction: column; min-width: 0; }
+  .pick-name { display: inline-flex; align-items: center; gap: 6px; font-size: 0.95rem; font-weight: 600; }
+  .pick.now .pick-name { color: var(--accent); }
+  .pick-why { font-size: 0.82rem; color: var(--muted); }
+  .heart { display: none; width: 11px; height: 11px; flex: none; color: var(--love); }
+  .loved .heart { display: inline-block; }
+  .eq { display: none; gap: 2px; align-items: flex-end; height: 10px; }
+  .eq span { width: 2px; height: 100%; background: currentColor; transform-origin: bottom; animation: eq 0.9s ease-in-out infinite; }
+  .eq span:nth-child(2) { animation-delay: -0.3s; }
+  .eq span:nth-child(3) { animation-delay: -0.6s; }
+  .pick.now.playing .eq { display: inline-flex; }
+  @keyframes eq { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+  .none-left { margin: 0; font-size: 0.85rem; color: var(--muted); }
+  .give { margin: 0; font-size: 0.88rem; color: var(--muted); }
+  .foot { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--line-soft); padding-top: 12px; }
+  .why-toggle {
+    align-self: flex-start; min-height: 44px; padding: 0; border: 0; background: none; color: var(--ink);
+    font: 600 0.95rem/1 var(--sans); display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  }
+  .why-toggle svg { width: 16px; height: 16px; transition: transform 0.2s ease; }
+  .why-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+  .why { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; padding: 20px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line-soft); }
+  .why div { display: flex; flex-direction: column; gap: 6px; }
+  .why b { font: 500 1.3rem/1.3 var(--mono); }
+  .why p { margin: 0; font-size: 0.82rem; line-height: 1.5; color: var(--soft); }
+
+  /* ------------------------------------------------------- the player dock */
+  .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; transform: translateY(110%); transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .dock.open { transform: none; }
+  .dock-inner {
+    max-width: 900px; margin: 0 auto; padding: 14px 16px 12px;
+    background: var(--raised); border: 1px solid var(--edge); border-bottom: 0; border-radius: 20px 20px 0 0;
+    box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.45);
+    display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 10px 14px; align-items: center;
+  }
+  .mini { position: relative; width: 56px; aspect-ratio: 1; grid-row: span 2; }
+  .mini-disc {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: repeating-radial-gradient(circle, var(--groove-a) 0 1.5px, var(--groove-b) 2px, var(--groove-a) 3px);
+    box-shadow: 0 0 0 1px var(--edge);
+    animation: spin 1.8s linear infinite; animation-play-state: paused;
+  }
+  .mini.spinning .mini-disc { animation-play-state: running; }
+  .mini-label { position: absolute; inset: 31%; border-radius: 50%; background: var(--accent); }
+  .mini-label::before { content: ""; position: absolute; left: 28%; right: 28%; top: 24%; height: 2px; border-radius: 1px; background: var(--on-accent); opacity: 0.6; }
+  .mini-label::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: var(--bg); }
+  .dock-info { min-width: 0; }
+  .dock-track { font-size: 1.05rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dock-artist, .dock-why { font-size: 0.85rem; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dock-why { color: var(--muted); }
+  .dock-top { display: flex; gap: 6px; align-items: center; }
+  .icon-btn {
+    display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 50%;
+    border: 1px solid var(--edge); background: var(--bg); color: var(--ink); cursor: pointer;
+  }
+  .icon-btn:hover:not(:disabled) { border-color: var(--accent); }
+  .icon-btn:disabled { opacity: 0.4; cursor: default; }
+  .icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .icon-btn svg .solid { fill: currentColor; stroke: none; }
+  .icon-btn.main { width: 44px; height: 44px; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .icon-btn.main:hover:not(:disabled) { background: var(--accent-hover); }
+  .icon-btn .pause, .icon-btn.playing .play { display: none; }
+  .icon-btn.playing .pause { display: block; }
+  .fb { width: auto; padding: 0 14px 0 11px; grid-auto-flow: column; gap: 6px; border-radius: 999px; font: 600 0.85rem/1 var(--sans); }
+  .fb svg { width: 16px; height: 16px; }
+  .fb.love[aria-pressed="true"] { color: var(--love); border-color: rgba(255, 156, 194, 0.5); }
+  .fb.love[aria-pressed="true"] svg path { fill: currentColor; }
+  .fb.nope[aria-pressed="true"] { color: var(--error); border-color: rgba(255, 167, 156, 0.45); }
+  .transport { grid-column: 2 / -1; display: flex; align-items: center; gap: 8px; }
+  .time { min-width: 4ch; text-align: center; font: 400 0.75rem/1 var(--mono); color: var(--muted); }
+  .seek { --p: 0%; flex: 1; min-width: 60px; height: 20px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
+  .seek:disabled { cursor: default; opacity: 0.4; }
+  .seek::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--p), var(--edge) var(--p)); }
+  .seek::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; margin-top: -4.5px; border: 0; border-radius: 50%; background: var(--ink); }
+  .seek::-moz-range-track { height: 4px; border-radius: 2px; background: var(--edge); }
+  .seek::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+  .seek::-moz-range-thumb { width: 13px; height: 13px; border: 0; border-radius: 50%; background: var(--ink); }
+  .dock-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .dock-note { font-size: 0.82rem; color: var(--muted); }
+  .dock-embed { grid-column: 1 / -1; min-height: 80px; border-radius: 12px; overflow: hidden; }
+  .dock-embed:empty { display: none; }
+  .dock-embed iframe { display: block; border: 0; }
+  .toast {
+    position: absolute; left: 50%; bottom: calc(100% + 12px); transform: translateX(-50%);
+    display: flex; gap: 12px; align-items: center; padding: 6px 6px 6px 16px; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--edge); font-size: 0.9rem; width: max-content; max-width: calc(100vw - 32px);
+  }
+  .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ------------------------------------------------------------ share card */
+  .share { width: min(420px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--edge); border-radius: 20px; background: var(--card); color: var(--ink); }
+  .share::backdrop { background: rgba(5, 8, 20, 0.72); }
+  .share h2 { font-size: 1.25rem; font-weight: 600; }
+  .share p { margin: 4px 0 16px; font-size: 0.9rem; color: var(--muted); }
+  .share canvas { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); }
+  .share .actions { margin-top: 16px; }
+
+  @media (max-width: 640px) {
+    .nav .link { display: none; }
+    .hero { padding: 48px 0 96px; }
+    .dock-inner { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px 12px; }
+    .mini { width: 48px; grid-row: auto; }
+    .transport { grid-column: 1 / -1; }
+    .fb { width: 40px; padding: 0; }
+    .fb span { display: none; }
+    body.has-dock { padding-bottom: 320px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .drift, .turn, .mini-disc, .eq span { animation: none; }
+    .record-big, .dock, .why-toggle svg { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="room" aria-hidden="true">
+  <div class="record-big">
+    <div class="drift"><div class="turn">
+      <div class="disc"><div class="disc-label"><span class="disc-name">echo</span><span class="disc-hole"></span><span class="disc-side">SIDE A · 33⅓ RPM</span></div></div>
+    </div></div>
+    <div class="sheen"></div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="topbar-band">
+    <div class="wrap">
+      <header class="topbar">
+        <div class="brand-group">
+          <a class="brand" href="/" aria-label="Echo home">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="14" r="3.2" fill="#8e9bff" stroke="none"/><path d="M13.66 8.34 A8 8 0 0 1 13.66 19.66"/><path d="M17.19 4.81 A13 13 0 0 1 17.19 23.19"/></svg>
+            <span>echo</span>
+          </a>
+          <span class="pill" id="demo-pill" hidden>Demo</span>
+        </div>
+        <nav class="nav" id="nav-out" aria-label="Main" hidden>
+          <a class="link" href="#how">How it works</a>
+          <a class="btn" href="/demo">Try the demo</a>
+        </nav>
+        <nav class="nav" id="nav-in" aria-label="Account" hidden>
+          <span class="who-name" id="who-name"></span>
+          <button class="btn" id="logout" type="button">Log out</button>
+        </nav>
+      </header>
+      <div class="notice" id="notice" role="alert" hidden></div>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------------- signed out -->
+  <main id="signed-out" hidden>
+    <div class="wrap">
+      <section class="hero">
+        <p class="eyebrow">Music-taste matching for Spotify</p>
+        <h1>Meet the people who'll put you onto new music.</h1>
+        <p class="lede">Echo reads your top artists and finds listeners who share your core taste and love artists you haven't heard yet.</p>
+        <div class="actions">
+          <a class="btn primary big" href="/demo">Try the demo
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn big" href="/login">Log in with Spotify</a>
+        </div>
+        <p class="hint">The demo runs on 150 sample listeners. No account needed.</p>
+      </section>
+    </div>
+
+    <section class="band alt" aria-labelledby="good-match">
+      <div class="wrap">
+        <div>
+          <h2 id="good-match">Who makes a good match?</h2>
+          <p class="formula">match = √(overlap × discovery)</p>
+        </div>
+        <div class="examples">
+          <div class="card example">
+            <div class="example-head"><div><strong>Your taste twin</strong><span>Same artists, same order</span></div><b>0.00</b></div>
+            <div class="meters">
+              <span>Overlap</span><div class="meter shared"><span style="width:100%"></span></div><span class="val">1.00</span>
+              <span>Discovery</span><div class="meter new"><span style="width:0%"></span></div><span class="val">0.000</span>
+            </div>
+            <p class="verdict">Nothing new to show you</p>
+          </div>
+          <div class="card example">
+            <div class="example-head"><div><strong>The jazz fan</strong><span>One artist in common</span></div><b>0.08</b></div>
+            <div class="meters">
+              <span>Overlap</span><div class="meter shared"><span style="width:39%"></span></div><span class="val">0.39</span>
+              <span>Discovery</span><div class="meter new"><span style="width:15%"></span></div><span class="val">0.016</span>
+            </div>
+            <p class="verdict">New music, but not your taste</p>
+          </div>
+          <div class="card example best">
+            <div class="example-head"><div><strong>The kindred spirit</strong><span>Shares your top two, plus two related artists</span></div><b>0.27</b></div>
+            <div class="meters">
+              <span>Overlap</span><div class="meter shared"><span style="width:71%"></span></div><span class="val">0.71</span>
+              <span>Discovery</span><div class="meter new"><span style="width:100%"></span></div><span class="val">0.104</span>
+            </div>
+            <p class="verdict">Best match: trusted taste and new artists</p>
+          </div>
+        </div>
+        <p class="hint">Real numbers from Echo's test suite: 14 listeners, scored against someone who loves four indie artists.</p>
+      </div>
+    </section>
+
+    <section class="band" id="how" aria-labelledby="how-title">
+      <div class="wrap">
+        <h2 id="how-title">How Echo matches people</h2>
+        <ol class="steps">
+          <li><span class="eyebrow">01</span><h3>Import</h3><p>Echo reads your top 50 artists from the last month, six months and all time, and weights long-term taste most.</p></li>
+          <li><span class="eyebrow">02</span><h3>Compare</h3><p>Your taste becomes a vector of artists. Sharing a niche artist counts for far more than sharing a superstar.</p></li>
+          <li><span class="eyebrow">03</span><h3>Discover</h3><p>People rank higher when the artists they love fit your taste and are new to you. It has to work both ways.</p></li>
+          <li><span class="eyebrow">04</span><h3>Connect</h3><p>Matches stay anonymous until you both choose to connect. Then you can start trading songs.</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <footer class="band site-foot">
+      <div class="wrap">
+        <span>Built with Python, FastAPI and Postgres.</span>
+        <a href="/docs">API docs</a>
+      </div>
+    </footer>
+  </main>
+
+  <!-- ---------------------------------------------------------- signed in -->
+  <main id="signed-in" hidden>
+    <div class="wrap app-grid">
+      <aside class="aside" aria-label="Your taste">
+        <section class="card panel">
+          <div>
+            <p class="eyebrow">Your taste</p>
+            <div class="panel-title" id="me-name"></div>
+          </div>
+          <div>
+            <div class="fp" id="me-print" style="height:56px"></div>
+            <p id="me-print-note" style="margin-top:10px">Your fingerprint: one bar per artist, taller for the ones you play most.</p>
+          </div>
+          <ol class="top-list" id="me-top"></ol>
+          <button class="btn" id="share-open" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 13v6h14v-6"/></svg>
+            Make a share card
+          </button>
+        </section>
+
+        <section class="card panel tight" id="settings" hidden>
+          <label class="toggle"><input type="checkbox" id="discoverable"> Let others find me</label>
+          <button class="btn" id="refresh" type="button">Refresh my artists</button>
+        </section>
+
+        <section class="card panel tight" id="demo-card" hidden>
+          <div class="panel-title" style="font-size:1rem">You're exploring the demo</div>
+          <p id="demo-text"></p>
+          <div class="actions" style="margin-top:8px">
+            <a class="btn small" href="/demo">Try another listener</a>
+            <a class="btn small" href="/login">Log in with Spotify</a>
+          </div>
+        </section>
+
+        <section class="card panel tight" id="connections-card" hidden>
+          <p class="eyebrow">Connections</p>
+          <ul class="people" id="connections"></ul>
+        </section>
+      </aside>
+
+      <section class="matches-col" aria-labelledby="matches-title">
+        <div class="page-head">
+          <h1 id="matches-title">Your matches</h1>
+          <p>Ranked by shared taste and by what each person could put you onto. Press play on an artist to hear a song.</p>
+        </div>
+        <div id="matches"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="dock" id="dock" aria-label="Player" role="region" hidden>
+  <div class="toast" id="toast" role="status" hidden>
+    <span id="toast-text"></span>
+    <button class="btn small" id="toast-undo" type="button">Undo</button>
+  </div>
+  <div class="dock-inner">
+    <div class="mini" id="dock-record" aria-hidden="true"><div class="mini-disc"><div class="mini-label"></div></div></div>
+    <div class="dock-info" aria-live="polite">
+      <div class="dock-track" id="dock-track"></div>
+      <div class="dock-artist" id="dock-artist"></div>
+      <div class="dock-why" id="dock-why" hidden></div>
+    </div>
+    <div class="dock-top">
+      <button class="icon-btn fb love" id="love" type="button" aria-pressed="false" aria-label="Love it">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.35-7-9.5A4 4 0 0 1 12 8a4 4 0 0 1 7 2.5C19 15.65 12 20 12 20z"/></svg>
+        <span>Love it</span>
+      </button>
+      <button class="icon-btn fb nope" id="nope" type="button" aria-pressed="false" aria-label="Not for me">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M6.4 6.4l11.2 11.2"/></svg>
+        <span>Not for me</span>
+      </button>
+      <button class="icon-btn" id="close-dock" type="button" aria-label="Close player" title="Close player">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>
+      </button>
+    </div>
+    <div class="transport">
+      <button class="icon-btn" id="replay" type="button" aria-label="Play from the start" title="Play from the start" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.05-4.95"/><path d="M5 4.5V9h4.5"/></svg>
+      </button>
+      <button class="icon-btn main" id="toggle" type="button" aria-label="Play" disabled>
+        <svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path class="solid" d="M8 5.6v12.8a.9.9 0 0 0 1.37.77l10.2-6.4a.9.9 0 0 0 0-1.54L9.37 4.83A.9.9 0 0 0 8 5.6z"/></svg>
+        <svg class="pause" viewBox="0 0 24 24" aria-hidden="true"><path class="solid" d="M7 5.5h3.4v13H7zM13.6 5.5H17v13h-3.4z"/></svg>
+      </button>
+      <button class="icon-btn" id="next" type="button" aria-label="Next suggestion" title="Next suggestion" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="solid" d="M5.5 6.3v11.4a.8.8 0 0 0 1.25.66l8.1-5.7a.8.8 0 0 0 0-1.32l-8.1-5.7a.8.8 0 0 0-1.25.66z"/><path d="M18 6v12"/></svg>
+      </button>
+      <span class="time" id="elapsed">0:00</span>
+      <input class="seek" id="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Song position" disabled>
+      <span class="time" id="duration">0:00</span>
+    </div>
+    <div class="dock-actions">
+      <button class="btn primary small" id="save" type="button" hidden>Add to Echo playlist</button>
+      <a class="btn small" id="reconnect" href="/login" hidden>Allow playlist saving</a>
+      <a class="btn small" id="open-playlist" target="_blank" rel="noopener" hidden>Open playlist</a>
+      <a class="btn small" id="open-spotify" target="_blank" rel="noopener">Open in Spotify</a>
+      <span class="dock-note" id="dock-note" hidden></span>
+    </div>
+    <div class="dock-embed" id="dock-embed"></div>
+  </div>
+</div>
+
+<dialog class="share" id="share" aria-labelledby="share-title">
+  <h2 id="share-title">Your share card</h2>
+  <p>Download it and post it anywhere. It shows your fingerprint and top five artists.</p>
+  <canvas id="share-canvas" width="1080" height="1350" role="img" aria-label="Share card with your taste fingerprint and top artists"></canvas>
+  <div class="actions">
+    <a class="btn primary" id="share-download" download="echo-taste.png" href="#">Download image</a>
+    <button class="btn" id="share-close" type="button">Close</button>
+  </div>
+</dialog>
+
+<script>
+const ERRORS = {
+  not_allowlisted: "Your Spotify account isn't on this app's user list yet. Spotify allows only 5 users per app in development mode, so ask the app owner to add the email on your Spotify account.",
+  state_mismatch: "That login link expired. Log in again.",
+  spotify_denied: "Spotify login was cancelled. Log in again when you're ready.",
+  spotify_error: "Spotify didn't respond properly. Try again in a minute.",
+  demo_unavailable: "The demo isn't available right now. Log in with Spotify instead, or try again later.",
+};
+
+const BUTTON = {
+  none: { label: "Connect", disabled: false, primary: true },
+  incoming: { label: "Accept", disabled: false, primary: true },
+  requested: { label: "Request sent", disabled: true },
+  connected: { label: "Connected", disabled: true },
+};
+
+const SUBTITLE = {
+  none: "Anonymous until you both connect",
+  incoming: "Wants to connect with you",
+  requested: "Anonymous until they accept",
+  connected: "Connected",
+};
+
+const PEOPLE_STATUS = { connected: "Connected", incoming: "Wants to connect", requested: "Request sent" };
+
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (id) => document.getElementById(id);
+let me = null;
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "class") node.className = value;
+    else if (key === "text") node.textContent = value;
+    else node.setAttribute(key, value);
+  }
+  for (const child of children) if (child) node.append(child);
+  return node;
+}
+
+function icon(d, { stroke = false, cls = null } = {}) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  if (cls) svg.setAttribute("class", cls);
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", d);
+  if (stroke) {
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "2.2");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+  } else {
+    path.setAttribute("fill", "currentColor");
+  }
+  svg.append(path);
+  return svg;
+}
+
+const PATHS = {
+  play: "M8 5.6v12.8a.9.9 0 0 0 1.37.77l10.2-6.4a.9.9 0 0 0 0-1.54L9.37 4.83A.9.9 0 0 0 8 5.6z",
+  pause: "M7 5.5h3.4v13H7zM13.6 5.5H17v13h-3.4z",
+  heart: "M12 21s-8.5-5.2-8.5-11.6A4.9 4.9 0 0 1 12 6.3a4.9 4.9 0 0 1 8.5 3.1C20.5 15.8 12 21 12 21z",
+  chevron: "M6 9l6 6 6-6",
+};
+
+function heart() {
+  return icon(PATHS.heart, { cls: "heart" });
+}
+
+function fingerprintBars(values, height) {
+  // The bars come from the server (matching.fingerprint): one per artist, the strongest = 1.
+  const box = el("div", { class: "fp", "aria-hidden": "true", style: `height:${height}px` });
+  for (const value of values || []) {
+    box.append(el("span", { style: `height:${Math.max(2, Math.round(value * height))}px` }));
+  }
+  return box;
+}
+
+function showNotice(message) {
+  $("notice").textContent = message;
+  $("notice").hidden = !message;
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+  if (response.status === 401) return null;
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const detail = typeof body.detail === "string" ? body.detail : null;
+    throw new Error(detail || `Request failed (${response.status})`);
+  }
+  return response.status === 204 ? true : response.json();
+}
+
+// ------------------------------------------------------------------ player
+
+const player = {
+  api: null,          // Spotify's iFrame API, once its script has loaded
+  controller: null,   // the embed controller, once the first song is loaded
+  pendingUri: null,
+  track: null,        // the song shown in the dock
+  chip: null,         // the play button that started it
+  ticket: 0,          // so only the most recent "play" request wins
+  paused: true,
+  position: 0,        // milliseconds, from the embed's playback updates
+  duration: 0,
+  nearEnd: false,     // was playing in the last moments of the song
+  ended: false,
+  scrubbing: false,   // the person is dragging the progress bar
+};
+
+const verdicts = new Map();      // artist id -> "like" | "dislike"
+const chipArtist = new WeakMap(); // play button -> the artist it plays
+
+function clock(ms) {
+  const seconds = Math.max(0, Math.floor((ms || 0) / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function loadSpotifyScript() {
+  if ($("spotify-iframe-api")) return;
+  window.onSpotifyIframeApiReady = (IFrameAPI) => {
+    player.api = IFrameAPI;
+    if (player.pendingUri) createController(player.pendingUri);
+  };
+  document.head.append(el("script", { id: "spotify-iframe-api", src: "https://open.spotify.com/embed/iframe-api/v1", async: "" }));
+}
+
+function rowOf(chip) {
+  return chip ? chip.closest(".pick") : null;
+}
+
+function setSpinning(on) {
+  $("dock-record").classList.toggle("spinning", on && !reducedMotion);
+  document.body.classList.toggle("music", on);  // the big record turns with the music
+  const row = rowOf(player.chip);
+  if (row) row.classList.toggle("playing", on);
+}
+
+function markNowPlaying(chip) {
+  for (const row of document.querySelectorAll(".pick.now")) row.classList.remove("now", "playing");
+  for (const button of document.querySelectorAll('.play-btn[aria-pressed="true"]')) button.setAttribute("aria-pressed", "false");
+  const row = rowOf(chip);
+  if (row) row.classList.add("now");
+  if (chip) chip.setAttribute("aria-pressed", "true");
+}
+
+function createController(uri) {
+  const target = el("div");
+  $("dock-embed").replaceChildren(target);
+  player.api.createController(target, { uri, width: "100%", height: 80 }, (controller) => {
+    player.controller = controller;
+    controller.addListener("ready", () => controller.play());
+    controller.addListener("playback_update", (event) => onPlayback(event.data));
+    syncTransport();
+  });
+}
+
+function onPlayback({ isPaused, isBuffering, duration, position }) {
+  const wasNearEnd = player.nearEnd;
+  player.paused = isPaused;
+  player.duration = duration || 0;
+  player.position = position || 0;
+  if (!isPaused) {
+    player.ended = false;
+    player.nearEnd = player.duration > 0 && player.position >= player.duration - 1500;
+  }
+  setSpinning(!isPaused && !isBuffering);
+  syncTransport();
+  // A song that plays to the end hands over to the next suggestion, like a radio.
+  if (isPaused && wasNearEnd) {
+    player.nearEnd = false;
+    player.ended = true;
+    playNext();
+  }
+}
+
+function resetProgress() {
+  Object.assign(player, { paused: true, position: 0, duration: 0, nearEnd: false, ended: false });
+}
+
+function loadInEmbed(uri) {
+  resetProgress();
+  if (player.controller) {
+    const load = player.controller.loadEntity || player.controller.loadUri;
+    load.call(player.controller, uri);
+    player.controller.play();
+  } else if (player.api) {
+    createController(uri);
+  } else {
+    player.pendingUri = uri;
+  }
+}
+
+function openDock() {
+  const dock = $("dock");
+  dock.hidden = false;
+  document.body.classList.add("has-dock");
+  requestAnimationFrame(() => dock.classList.add("open"));
+}
+
+function whoSuggested(chip) {
+  const card = chip && chip.closest(".match");
+  const name = card && card.querySelector(".match-name");
+  return name ? name.firstChild.textContent : null;
+}
+
+function renderDock(track, chip) {
+  const from = whoSuggested(chip);
+  const artist = chipArtist.get(chip);
+  $("dock-track").textContent = track.track_name || "No song to preview";
+  $("dock-artist").textContent = from ? `${track.artist_name} · via ${from}` : track.artist_name;
+  $("dock-why").textContent = artist && artist.because ? `Because you like ${artist.because}` : "";
+  $("dock-why").hidden = !(artist && artist.because);
+  $("dock-embed").hidden = !track.uri;
+  renderFeedback();
+  $("open-spotify").href = track.spotify_url;
+  $("open-playlist").hidden = true;
+
+  const save = $("save");
+  const note = $("dock-note");
+  save.hidden = $("reconnect").hidden = note.hidden = true;
+  save.disabled = false;
+  save.textContent = "Add to Echo playlist";
+
+  if (!track.uri) {
+    note.textContent = "Spotify didn't give us a song for this artist.";
+    note.hidden = false;
+  } else if (me.is_demo) {
+    note.textContent = "Log in with Spotify to save songs and keep your feedback.";
+    note.hidden = false;
+  } else if (me.can_save_tracks) {
+    save.hidden = false;
+  } else {
+    $("reconnect").hidden = false;
+  }
+  syncTransport();
+}
+
+async function playArtist(artist, chip) {
+  if (player.chip === chip && player.controller && player.track && player.track.uri) {
+    player.controller.togglePlay();
+    return;
+  }
+  const ticket = ++player.ticket;
+  chip.setAttribute("aria-busy", "true");
+  try {
+    const track = await api(`/api/artists/${encodeURIComponent(artist.id)}/track`);
+    if (!track || ticket !== player.ticket) return;  // a newer choice already took over
+    if (!me.is_demo) setLocalVerdict(track.artist_id, track.verdict);
+    player.track = track;
+    player.chip = chip;
+    markNowPlaying(chip);
+    renderDock(track, chip);
+    openDock();
+    if (track.uri) {
+      loadInEmbed(track.uri);
+    } else {
+      // Nothing to play for this artist: stop the last song rather than leave it running.
+      if (player.controller) player.controller.pause();
+      resetProgress();
+      setSpinning(false);
+      syncTransport();
+    }
+  } catch (error) {
+    showNotice(error.message);
+  } finally {
+    chip.removeAttribute("aria-busy");
+  }
+}
+
+// ---- transport: play/pause, replay, next, and the progress bar
+
+function suggestionChips() {
+  return [...document.querySelectorAll("#matches .play-btn")];
+}
+
+function nextChip() {
+  // The suggestions on the page, in order, form the queue. Skip hidden ones and repeats.
+  const chips = suggestionChips();
+  const at = player.chip ? chips.indexOf(player.chip) : -1;
+  const playing = player.track ? String(player.track.artist_id) : null;
+  for (let step = 1; step <= chips.length; step++) {
+    const chip = chips[(at + step + chips.length) % chips.length];
+    if (chip.closest("li").hidden || chip.dataset.artistId === playing) continue;
+    return chip;
+  }
+  return null;
+}
+
+function playNext() {
+  const chip = nextChip();
+  if (chip) playArtist(chipArtist.get(chip), chip);
+}
+
+function paintSeek() {
+  $("seek").style.setProperty("--p", `${$("seek").value / 10}%`);
+}
+
+function syncTransport() {
+  const ready = Boolean(player.controller && player.track && player.track.uri);
+  const toggle = $("toggle");
+  toggle.disabled = $("replay").disabled = $("seek").disabled = !ready;
+  toggle.classList.toggle("playing", ready && !player.paused);
+  toggle.setAttribute("aria-label", ready && !player.paused ? "Pause" : "Play");
+
+  const upNext = nextChip();
+  const next = $("next");
+  const label = upNext ? `Next: ${chipArtist.get(upNext).name}` : "No other suggestions";
+  next.disabled = !upNext;
+  next.setAttribute("aria-label", label);
+  next.title = label;
+
+  if (!player.scrubbing) {
+    $("seek").value = player.duration ? Math.round((player.position / player.duration) * 1000) : 0;
+    $("elapsed").textContent = clock(player.position);
+    $("duration").textContent = clock(player.duration);
+    paintSeek();
+  }
+}
+
+$("toggle").addEventListener("click", () => {
+  if (player.controller) player.controller.togglePlay();
+});
+
+$("replay").addEventListener("click", () => {
+  const controller = player.controller;
+  if (!controller) return;
+  if (player.ended) {
+    controller.play();
+  } else {
+    controller.seek(0);
+    if (player.paused) controller.resume();
+  }
+});
+
+$("next").addEventListener("click", playNext);
+
+$("seek").addEventListener("input", () => {
+  // While dragging, show where you'd land; jump there when you let go.
+  player.scrubbing = true;
+  $("elapsed").textContent = clock(($("seek").value / 1000) * player.duration);
+  paintSeek();
+});
+
+$("seek").addEventListener("change", () => {
+  player.scrubbing = false;
+  if (player.controller && player.duration) {
+    player.controller.seek(($("seek").value / 1000) * (player.duration / 1000));
+  }
+});
+
+// ---- feedback: "Love it" and "Not for me"
+
+function renderFeedback() {
+  const verdict = player.track ? verdicts.get(player.track.artist_id) : undefined;
+  $("love").setAttribute("aria-pressed", String(verdict === "like"));
+  $("nope").setAttribute("aria-pressed", String(verdict === "dislike"));
+}
+
+function setLocalVerdict(artistId, verdict) {
+  if (verdict) verdicts.set(artistId, verdict);
+  else verdicts.delete(artistId);
+  // The same artist can appear on several cards; update every copy.
+  for (const node of document.querySelectorAll(`[data-artist-id="${artistId}"]`)) {
+    node.classList.toggle("loved", verdict === "like");
+    const item = node.closest("li.pick");
+    if (item) item.hidden = verdict === "dislike";
+  }
+  for (const box of document.querySelectorAll(".suggestions")) {
+    const anyLeft = [...box.querySelectorAll("li.pick")].some((item) => !item.hidden);
+    box.querySelector(".none-left").hidden = anyLeft;
+  }
+  renderFeedback();
+  syncTransport();
+}
+
+async function setVerdict(track, verdict) {
+  const before = verdicts.get(track.artist_id) || null;
+  setLocalVerdict(track.artist_id, verdict);
+  if (me.is_demo) return true;  // demo feedback lives only in this page
+  try {
+    await api(`/api/feedback/${encodeURIComponent(track.artist_id)}`, {
+      method: "PUT",
+      body: JSON.stringify({ verdict, track_id: track.track_id }),
+    });
+    return true;
+  } catch (error) {
+    setLocalVerdict(track.artist_id, before);
+    showNotice(error.message);
+    return false;
+  }
+}
+
+let toastTimer = null;
+
+function showToast(text, undo) {
+  $("toast-text").textContent = text;
+  $("toast").hidden = false;
+  $("toast-undo").onclick = () => { hideToast(); undo(); };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 7000);
+}
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  $("toast").hidden = true;
+}
+
+$("love").addEventListener("click", () => {
+  if (!player.track) return;
+  const loved = verdicts.get(player.track.artist_id) === "like";
+  setVerdict(player.track, loved ? null : "like");
+});
+
+$("nope").addEventListener("click", async () => {
+  const track = player.track;
+  if (!track) return;
+  if (verdicts.get(track.artist_id) === "dislike") {
+    setVerdict(track, null);
+    return;
+  }
+  // Hide the artist everywhere, offer an undo, and move on to the next suggestion.
+  const upNext = nextChip();
+  if (!(await setVerdict(track, "dislike"))) return;
+  showToast(`We won't suggest ${track.artist_name} again.`, () => setVerdict(track, null));
+  if (upNext && player.track === track) {
+    playArtist(chipArtist.get(upNext), upNext);
+  } else if (player.controller) {
+    player.controller.pause();
+  }
+});
+
+$("close-dock").addEventListener("click", () => {
+  if (player.controller) player.controller.pause();
+  player.ticket++;
+  setSpinning(false);
+  hideToast();
+  markNowPlaying(null);
+  player.chip = null;
+  const dock = $("dock");
+  dock.classList.remove("open");
+  document.body.classList.remove("has-dock");
+  setTimeout(() => { if (!dock.classList.contains("open")) dock.hidden = true; }, reducedMotion ? 0 : 450);
+});
+
+$("save").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  if (!player.track || !player.track.track_id) return;
+  button.disabled = true;
+  button.textContent = "Saving...";
+  try {
+    const result = await api("/api/playlist/tracks", {
+      method: "POST",
+      body: JSON.stringify({ track_id: player.track.track_id }),
+    });
+    button.textContent = "Added";
+    $("open-playlist").href = result.playlist_url;
+    $("open-playlist").hidden = false;
+  } catch (error) {
+    showNotice(error.message);
+    button.disabled = false;
+    button.textContent = "Add to Echo playlist";
+  }
+});
+
+// ------------------------------------------------------------------ matches
+
+function chipList(artists) {
+  const list = el("ul", { class: "chips" });
+  for (const artist of artists) {
+    const item = el("li", { "data-artist-id": artist.id }, document.createTextNode(artist.name), heart());
+    item.classList.toggle("loved", verdicts.get(artist.id) === "like");
+    list.append(item);
+  }
+  return list;
+}
+
+function pickList(artists) {
+  // The artists they could put you onto, each with a play button. Hidden ones are "not for me".
+  const list = el("ul", { class: "picks" });
+  for (const artist of artists) {
+    const button = el("button", {
+      class: "play-btn", type: "button", "aria-pressed": "false",
+      "aria-label": `Play a song by ${artist.name}`, "data-artist-id": artist.id,
+    }, icon(PATHS.play, { cls: "play" }), icon(PATHS.pause, { cls: "pause" }));
+    chipArtist.set(button, artist);
+    button.addEventListener("click", () => playArtist(artist, button));
+
+    const eq = el("span", { class: "eq", "aria-hidden": "true" }, el("span"), el("span"), el("span"));
+    const name = el("span", { class: "pick-name" }, document.createTextNode(artist.name), heart(), eq);
+    const why = el("span", { class: "pick-why", text: artist.because ? `because you like ${artist.because}` : "new to you" });
+    const item = el("li", { class: "pick", "data-artist-id": artist.id }, button, el("div", { class: "pick-text" }, name, why));
+    item.classList.toggle("loved", verdicts.get(artist.id) === "like");
+    item.hidden = verdicts.get(artist.id) === "dislike";
+    list.append(item);
+  }
+  const noneLeft = el("p", { class: "none-left", text: "Nothing new here yet." });
+  noneLeft.hidden = artists.some((artist) => verdicts.get(artist.id) !== "dislike");
+  return el("div", { class: "suggestions" }, list, noneLeft);
+}
+
+function meters(rows) {
+  const box = el("div", { class: "meters" });
+  for (const { kind, label, fill, value } of rows) {
+    const pct = Math.round(Math.max(0, Math.min(1, fill)) * 100);
+    const bar = el("div", { class: `meter ${kind}`, role: "img", "aria-label": `${label}: ${pct} out of 100` }, el("span", { style: `width:${pct}%` }));
+    box.append(el("span", { text: label }), bar, el("span", { class: "val", text: value }));
+  }
+  return box;
+}
+
+function connectButton(match, nameNode, subNode) {
+  const button = el("button", { class: "btn", type: "button" });
+  const apply = (status) => {
+    const state = BUTTON[status] || BUTTON.none;
+    button.textContent = state.label;
+    button.disabled = state.disabled;
+    button.classList.toggle("primary", Boolean(state.primary));
+    button.classList.toggle("done", state.disabled);
+    subNode.textContent = SUBTITLE[status] || SUBTITLE.none;
+  };
+  apply(match.connection);
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const result = await api(`/api/connections/${encodeURIComponent(match.user_id)}`, { method: "POST" });
+      apply(result.status);
+      nameNode.firstChild.textContent = result.name;
+      loadConnections();
+    } catch (error) {
+      showNotice(error.message);
+      apply(match.connection);
+    }
+  });
+  return button;
+}
+
+function whyPanel(match) {
+  const mutual = Math.min(match.discovery_for_you, match.discovery_for_them);
+  const cell = (label, value, text) => el("div", {}, el("span", { class: "eyebrow", text: label }), el("b", { text: value }), el("p", { text }));
+  return el("div", { class: "why" },
+    cell("Shared taste", match.overlap.toFixed(2),
+      "Cosine similarity of your two artist vectors. Rare artists count for more than superstars."),
+    cell("New music", mutual.toFixed(3),
+      `How well each person's unfamiliar artists fit the other's taste: ${match.discovery_for_you.toFixed(3)} for you, ${match.discovery_for_them.toFixed(3)} for them. The smaller one counts.`),
+    cell("Match", `√(${match.overlap.toFixed(2)} × ${mutual.toFixed(3)}) = ${match.score.toFixed(2)}`,
+      "A geometric mean, so a weak score on either side pulls the match down. A taste twin scores zero."),
+  );
+}
+
+function matchCard(match, scale, index) {
+  const nameNode = el("h2", { class: "match-name" }, document.createTextNode(match.name));
+  const subNode = el("span", { class: "match-sub" });
+  const scoreBlock = el("div", { class: "score-block" },
+    el("div", { class: "score" }, el("b", { text: match.score.toFixed(2) }), el("small", { text: "Match" })));
+  if (match.is_demo) {
+    subNode.textContent = "Sample listener, so you can't connect";
+  } else {
+    scoreBlock.append(connectButton(match, nameNode, subNode));
+  }
+
+  const head = el("div", { class: "match-head" },
+    el("div", { class: "who-block" },
+      el("span", { class: "rank", text: String(index + 1).padStart(2, "0") }),
+      fingerprintBars(match.fingerprint, 28),
+      el("div", { class: "who-text" }, nameNode, subNode)),
+    scoreBlock);
+
+  const bars = meters([
+    { kind: "shared", label: "Shared taste", fill: match.overlap, value: match.overlap.toFixed(2) },
+    // "New for you" is drawn relative to your best match so the bars are readable.
+    { kind: "new", label: "New for you", fill: match.discovery_for_you / scale, value: match.discovery_for_you.toFixed(3) },
+  ]);
+
+  const sides = el("div", { class: "sides" },
+    el("section", { class: "side" }, el("h3", { text: "You both love" }), chipList(match.shared_artists)),
+    el("section", { class: "side" }, el("h3", { text: "They could put you onto" }), pickList(match.they_could_put_you_on)),
+  );
+
+  const give = match.you_could_put_them_on.length
+    ? el("p", { class: "give", text: `You could put them onto ${match.you_could_put_them_on.map((a) => a.name).join(", ")}.` })
+    : null;
+
+  const panel = whyPanel(match);
+  panel.hidden = true;
+  const toggle = el("button", { class: "why-toggle", type: "button", "aria-expanded": "false" },
+    el("span", { text: "Why this match?" }), icon(PATHS.chevron, { stroke: true }));
+  toggle.addEventListener("click", () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute("aria-expanded", String(!panel.hidden));
+    toggle.firstChild.textContent = panel.hidden ? "Why this match?" : "Hide the math";
+  });
+
+  return el("article", { class: "card match" }, head, bars, sides, give, el("div", { class: "foot" }, toggle, panel));
+}
+
+async function loadMatches() {
+  const container = $("matches");
+  container.replaceChildren(el("p", { class: "hint", text: "Finding your matches..." }));
+  const matches = await api("/api/matches");
+  container.replaceChildren();
+  if (!matches || matches.length === 0) {
+    container.append(el("div", { class: "card empty", text: "No one to match with yet. Invite a friend to log in with Spotify, then check back." }));
+    return;
+  }
+  // Your feedback comes back with the matches (demo feedback only lives in this page).
+  if (!me.is_demo) verdicts.clear();
+  for (const match of matches) {
+    for (const artist of [...match.shared_artists, ...match.they_could_put_you_on, ...match.you_could_put_them_on]) {
+      if (artist.verdict) verdicts.set(artist.id, artist.verdict);
+    }
+  }
+  const scale = Math.max(...matches.map((m) => m.discovery_for_you), 1e-9);
+  const list = el("div", { style: "display:flex;flex-direction:column;gap:16px" });
+  matches.forEach((match, index) => list.append(matchCard(match, scale, index)));
+  container.append(list);
+}
+
+async function loadConnections() {
+  if (!me || me.is_demo) return;
+  try {
+    const people = (await api("/api/connections")) || [];
+    $("connections").replaceChildren(...people.map((person) =>
+      el("li", {}, el("strong", { text: person.name, style: "font-weight:500" }), el("span", { text: PEOPLE_STATUS[person.status] || person.status }))));
+    $("connections-card").hidden = people.length === 0;
+  } catch {
+    $("connections-card").hidden = true;  // not worth an error banner
+  }
+}
+
+function renderMe(profile) {
+  me = profile;
+  $("who-name").textContent = me.display_name;
+  $("me-name").textContent = me.display_name;
+  $("demo-pill").hidden = !me.is_demo;
+  $("demo-card").hidden = !me.is_demo;
+  $("settings").hidden = me.is_demo;
+  $("logout").textContent = me.is_demo ? "Exit demo" : "Log out";
+  if (me.is_demo) {
+    $("demo-text").textContent = `You're ${me.display_name}, one of the sample listeners. Your matches are other sample listeners, and you can play their songs.`;
+  }
+  $("discoverable").checked = me.discoverable;
+
+  const print = fingerprintBars(me.fingerprint, 56);
+  print.id = "me-print";
+  $("me-print").replaceWith(print);
+  $("me-print-note").textContent = me.fingerprint.length
+    ? `Your fingerprint: ${me.fingerprint.length} artists, taller for the ones you play most.`
+    : "We couldn't find top artists on your account yet. Listen for a while, then refresh.";
+  $("me-top").replaceChildren(...me.top_artists.slice(0, 8).map((name, i) =>
+    el("li", {}, el("span", { class: "n", text: String(i + 1).padStart(2, "0") }), el("span", { text: name }))));
+  $("share-open").hidden = me.top_artists.length === 0;
+}
+
+// ------------------------------------------------------------- share card
+
+function fitText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let cut = text;
+  while (cut.length > 1 && ctx.measureText(`${cut}…`).width > maxWidth) cut = cut.slice(0, -1);
+  return `${cut.trimEnd()}…`;
+}
+
+function roundedBar(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, Math.min(r, h / 2));
+  else ctx.rect(x, y, w, h);
+  ctx.fill();
+}
+
+async function drawShareCard() {
+  const canvas = $("share-canvas");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width;
+  const H = canvas.height;
+  const ink = "#eef1fa";
+  const muted = "#a3acc9";
+  const accent = "#8e9bff";
+  const navy = "#0a1024";
+  try {
+    await Promise.all([
+      document.fonts.load('700 42px "Schibsted Grotesk"'),
+      document.fonts.load('600 52px "Schibsted Grotesk"'),
+      document.fonts.load('500 30px "Schibsted Grotesk"'),
+      document.fonts.load('400 22px "JetBrains Mono"'),
+    ]);
+  } catch { /* fall back to system fonts */ }
+  const sans = (weight, size) => `${weight} ${size}px "Schibsted Grotesk", system-ui, sans-serif`;
+  const mono = (size) => `400 ${size}px "JetBrains Mono", ui-monospace, monospace`;
+
+  ctx.fillStyle = navy;
+  ctx.fillRect(0, 0, W, H);
+
+  // A record peeking in from the top-right corner.
+  const cx = 1000, cy = 120, R = 380;
+  ctx.fillStyle = "#06080f";
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#111731";
+  ctx.lineWidth = 1;
+  for (let r = 136; r < R - 2; r += 4) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.strokeStyle = "#1e274a";
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.arc(cx, cy, 129, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = navy;
+  ctx.beginPath(); ctx.arc(cx, cy, 9, 0, Math.PI * 2); ctx.fill();
+
+  // Wordmark.
+  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.arc(92 + 13, 112, 5.3, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 3.6;
+  ctx.lineCap = "round";
+  ctx.beginPath(); ctx.arc(105, 112, 13.2, -Math.PI / 4, Math.PI / 4); ctx.stroke();
+  ctx.beginPath(); ctx.arc(105, 112, 21.5, -Math.PI / 4, Math.PI / 4); ctx.stroke();
+  ctx.fillStyle = ink;
+  ctx.font = sans(700, 42);
+  ctx.textBaseline = "middle";
+  ctx.fillText("echo", 152, 112);
+
+  // Fingerprint.
+  ctx.textBaseline = "alphabetic";
+  const month = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  ctx.fillStyle = muted;
+  ctx.font = mono(22);
+  ctx.fillText(`MY TASTE FINGERPRINT · ${month.toUpperCase()}`, 92, 270);
+  const bars = (me.fingerprint || []).slice(0, 50);
+  const baseline = 650;
+  const step = bars.length ? Math.min(16, 896 / bars.length) : 16;
+  const barW = Math.max(4, step * 0.62);
+  ctx.fillStyle = ink;
+  bars.forEach((value, i) => {
+    const h = Math.max(4, Math.round(value * 340));
+    roundedBar(ctx, 92 + i * step, baseline - h, barW, h, 3);
+  });
+  ctx.fillStyle = muted;
+  ctx.font = sans(400, 26);
+  ctx.fillText(bars.length ? `${bars.length} artists. The tallest bars are the ones I play most.` : "", 92, 700);
+
+  // Top five.
+  let y = 752;
+  me.top_artists.slice(0, 5).forEach((name, i) => {
+    ctx.fillStyle = "#26315c";
+    ctx.fillRect(92, y, 896, 2);
+    ctx.fillStyle = muted;
+    ctx.font = mono(24);
+    ctx.fillText(String(i + 1).padStart(2, "0"), 92, y + 56);
+    ctx.fillStyle = ink;
+    ctx.font = sans(600, 48);
+    ctx.fillText(fitText(ctx, name, 820), 164, y + 60);
+    y += 78;
+  });
+
+  // Footer.
+  ctx.fillStyle = ink;
+  ctx.font = sans(500, 30);
+  ctx.fillText("Find the people who could put", 92, 1224);
+  ctx.fillText("you onto new music.", 92, 1263);
+  ctx.fillStyle = muted;
+  ctx.font = mono(24);
+  ctx.textAlign = "right";
+  ctx.fillText(fitText(ctx, location.host, 420), W - 92, 1263);
+  ctx.textAlign = "left";
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  const link = $("share-download");
+  if (link.dataset.url) URL.revokeObjectURL(link.dataset.url);
+  if (blob) {
+    link.dataset.url = URL.createObjectURL(blob);
+    link.href = link.dataset.url;
+  }
+}
+
+$("share-open").addEventListener("click", async () => {
+  const dialog = $("share");
+  if (dialog.showModal) dialog.showModal(); else dialog.setAttribute("open", "");
+  try { await drawShareCard(); } catch (error) { showNotice(error.message); }
+});
+
+$("share-close").addEventListener("click", () => $("share").close());
+
+// -------------------------------------------------------------------- start
+
+function showRoom(view) {
+  document.body.classList.add(view);
+  requestAnimationFrame(() => document.body.classList.add("ready"));
+}
+
+async function start() {
+  const params = new URLSearchParams(location.search);
+  const error = params.get("error");
+  if (error) {
+    showNotice(ERRORS[error] || "Something went wrong. Try again.");
+    history.replaceState(null, "", "/");
+  }
+
+  const profile = await api("/api/me");
+  if (!profile) {
+    showRoom("landing-view");
+    $("nav-out").hidden = false;
+    $("signed-out").hidden = false;
+    return;
+  }
+  showRoom("app-view");
+  $("nav-in").hidden = false;
+  $("signed-in").hidden = false;
+  renderMe(profile);
+  loadSpotifyScript();
+  await Promise.all([loadMatches(), loadConnections()]);
+}
+
+$("logout").addEventListener("click", async () => {
+  await api("/logout", { method: "POST" });
+  location.href = "/";
+});
+
+$("discoverable").addEventListener("change", async (event) => {
+  try {
+    renderMe(await api("/api/me", { method: "PATCH", body: JSON.stringify({ discoverable: event.target.checked }) }));
+  } catch (error) {
+    showNotice(error.message);
+    event.target.checked = !event.target.checked;
+  }
+});
+
+$("refresh").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  button.textContent = "Refreshing...";
+  try {
+    renderMe(await api("/api/me/refresh", { method: "POST" }));
+    await loadMatches();
+    showNotice("");
+  } catch (error) {
+    showNotice(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Refresh my artists";
+  }
+});
+
+start().catch((error) => {
+  showRoom("landing-view");
+  showNotice(error.message);
+});
+</script>
+</body>
+</html>
